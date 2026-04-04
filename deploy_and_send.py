@@ -215,13 +215,14 @@ if __name__ == "__main__":
     print(f"{'='*55}\n")
 
     inline_css()
+    # Pobierz site_id raz i przekaż dalej
+    _site_id = get_or_create_site()
     netlify_url = deploy_to_netlify()
 
     if netlify_url:
         update_nav_links(netlify_url)
         # Drugi deploy z zaktualizowanymi linkami
         print("      Re-deploy z zaktualizowanymi linkami...")
-        site_id = SITE_ID_FILE.read_text().strip()
         with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as tmp:
             zip_path = tmp.name
         with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
@@ -229,7 +230,7 @@ if __name__ == "__main__":
             zf.write(FINAL_HTML, NEWSLETTER_FILE)
         with open(zip_path, "rb") as f:
             requests.post(
-                f"{NETLIFY_API}/sites/{site_id}/deploys",
+                f"{NETLIFY_API}/sites/{_site_id}/deploys",
                 headers={**HEADERS, "Content-Type": "application/zip"},
                 data=f
             )
