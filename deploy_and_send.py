@@ -53,7 +53,28 @@ def inline_css():
     FINAL_HTML.write_text(result, encoding="utf-8")
     print(f"      ✅ Zapisano: {FINAL_HTML.name}")
 
-# ─── KROK 2: NETLIFY DEPLOY ──────────────────────────────────────────────────
+# ─── KROK 2: PRZYGOTOWANIE LINKÓW (przed deployem) ──────────────────────────
+def prepare_nav_links():
+    """Aktualizuje linki nawigacyjne i src grafiki PRZED deployem — 1 deploy zamiast 2."""
+    print("[2/4] Przygotowuję linki nawigacyjne i grafikę...")
+    netlify_base = "https://onaudience-daily-intel.netlify.app"
+    base = f"{netlify_base}/{NEWSLETTER_FILE}"
+    hero_url = f"{netlify_base}/{HERO_IMG.name}"
+    html = FINAL_HTML.read_text(encoding="utf-8")
+
+    import re
+    html = re.sub(r'href="[^"]*#monitoring"', f'href="{base}#monitoring"', html)
+    html = re.sub(r'href="[^"]*#newsy"',      f'href="{base}#newsy"',      html)
+    html = re.sub(r'href="[^"]*#trendy"',     f'href="{base}#trendy"',     html)
+    html = re.sub(r'src="cid:hero_image"', f'src="{hero_url}"', html)
+    html = re.sub(r'src="newsletter_hero_april2026\.png"', f'src="{hero_url}"', html)
+
+    FINAL_HTML.write_text(html, encoding="utf-8")
+    print(f"      ✅ Linki nawigacyjne: {base}")
+    print(f"      ✅ Grafika hero URL: {hero_url}")
+    return netlify_base
+
+# ─── KROK 3: NETLIFY DEPLOY ──────────────────────────────────────────────────
 def get_or_create_site():
     """Zwraca site_id — z env var, pliku cache lub tworzy nowy."""
     if NETLIFY_SITE_ID:
@@ -121,35 +142,10 @@ def deploy_to_netlify():
     print(f"      ✅ Deploy OK → {site_url}")
     return site_url
 
-# ─── KROK 3: AKTUALIZACJA LINKÓW NAWIGACYJNYCH ───────────────────────────────
+# ─── KROK 4 (helper): AKTUALIZACJA LINKÓW — zachowane dla kompatybilności ────
 def update_nav_links(netlify_url: str):
-    print("[3/4] Aktualizuję linki nawigacyjne i grafikę...")
-    base = f"{netlify_url.rstrip('/')}/{NEWSLETTER_FILE}"
-    hero_url = f"{netlify_url.rstrip('/')}/{HERO_IMG.name}"
-    html = FINAL_HTML.read_text(encoding="utf-8")
-
-    import re
-    # Aktualizuj linki nawigacyjne
-    html = re.sub(r'href="[^"]*#monitoring"', f'href="{base}#monitoring"', html)
-    html = re.sub(r'href="[^"]*#newsy"',      f'href="{base}#newsy"',      html)
-    html = re.sub(r'href="[^"]*#trendy"',     f'href="{base}#trendy"',     html)
-
-    # Podmień src grafiki hero na URL Netlify (dla wersji online)
-    html = re.sub(
-        r'src="cid:hero_image"',
-        f'src="{hero_url}"',
-        html
-    )
-    html = re.sub(
-        r'src="newsletter_hero_april2026\.png"',
-        f'src="{hero_url}"',
-        html
-    )
-
-    FINAL_HTML.write_text(html, encoding="utf-8")
-    print(f"      ✅ Linki nawigacyjne: {base}")
-    print(f"      ✅ Grafika hero URL: {hero_url}")
-    return base
+    """Zachowane dla kompatybilności — główna logika przeniesiona do prepare_nav_links()."""
+    return f"{netlify_url.rstrip('/')}/{NEWSLETTER_FILE}"
 
 # ─── KROK 4: WYSYŁKA EMAIL ───────────────────────────────────────────────────
 def send_email(netlify_base_url: str):
@@ -215,29 +211,12 @@ if __name__ == "__main__":
     print(f"{'='*55}\n")
 
     inline_css()
-    # Pobierz site_id raz i przekaż dalej
-    _site_id = get_or_create_site()
-    netlify_url = deploy_to_netlify()
+    # Krok 2: Przygotuj linki PRZED deployem (1 deploy zamiast 2)
+    netlify_url = prepare_nav_links()
+    # Krok 3: Jeden deploy z już zaktualizowanymi linkami i grafiką
+    deploy_result = deploy_to_netlify()
 
-    if netlify_url:
-        update_nav_links(netlify_url)
-        # Drugi deploy z zaktualizowanymi linkami
-        print("      Re-deploy z zaktualizowanymi linkami...")
-        with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as tmp:
-            zip_path = tmp.name
-        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
-            zf.write(FINAL_HTML, "index.html")
-            zf.write(FINAL_HTML, NEWSLETTER_FILE)
-            # Zawsze dodaj grafikę hero do re-deployu
-            if HERO_IMG.exists():
-                zf.write(HERO_IMG, HERO_IMG.name)
-        with open(zip_path, "rb") as f:
-            requests.post(
-                f"{NETLIFY_API}/sites/{_site_id}/deploys",
-                headers={**HEADERS, "Content-Type": "application/zip"},
-                data=f
-            )
-        os.unlink(zip_path)
+    if deploy_result:
         send_email(netlify_url)
     else:
         print("      ⚠️  Deploy nie powiódł się — wysyłam bez linków Netlify")
