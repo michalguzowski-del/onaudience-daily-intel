@@ -228,6 +228,9 @@ if __name__ == "__main__":
         with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
             zf.write(FINAL_HTML, "index.html")
             zf.write(FINAL_HTML, NEWSLETTER_FILE)
+            # Zawsze dodaj grafikę hero do re-deployu
+            if HERO_IMG.exists():
+                zf.write(HERO_IMG, HERO_IMG.name)
         with open(zip_path, "rb") as f:
             requests.post(
                 f"{NETLIFY_API}/sites/{_site_id}/deploys",
