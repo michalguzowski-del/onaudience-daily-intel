@@ -29,11 +29,14 @@ import content_generator
 # ─── KONFIGURACJA — wyłącznie zmienne środowiskowe (GitHub Secrets) ──────────
 GMAIL_USER     = os.environ["GMAIL_USER"]
 GMAIL_APP_PASS = os.environ["GMAIL_APP_PASSWORD"]
-RECIPIENT      = os.environ.get("RECIPIENT_EMAIL", sys.argv[1] if len(sys.argv) > 1 else "")
+# Obsługa wielu odbiorców rozdzielonych przecinkami
+_recipients_raw = os.environ.get("RECIPIENT_EMAIL", sys.argv[1] if len(sys.argv) > 1 else "")
+RECIPIENTS     = [r.strip() for r in _recipients_raw.split(",") if r.strip()]
+RECIPIENT      = RECIPIENTS[0] if RECIPIENTS else ""  # dla kompatybilności
 GH_TOKEN       = os.environ["GH_TOKEN"]
 GH_REPO        = os.environ.get("GH_REPO", "michalguzowski-del/onaudience-daily-intel")
 
-if not RECIPIENT:
+if not RECIPIENTS:
     print("Brak RECIPIENT_EMAIL — ustaw zmienną środowiskową lub podaj jako argument")
     sys.exit(1)
 
@@ -199,12 +202,12 @@ def deploy_to_github_pages():
 
 # ─── KROK 4: WYSYŁKA EMAIL ───────────────────────────────────────────────────
 def send_email():
-    print(f"[4/4] Wysylam email do: {RECIPIENT}...")
+    print(f"[4/4] Wysylam email do {len(RECIPIENTS)} odbiorcy: {', '.join(RECIPIENTS)}...")
 
     msg = MIMEMultipart("related")
     msg["Subject"]    = SUBJECT
     msg["From"]       = f"OnAudience Daily Intelligence <{GMAIL_USER}>"
-    msg["To"]         = RECIPIENT
+    msg["To"]         = ", ".join(RECIPIENTS)
     msg["Message-ID"] = f"<{uuid.uuid4()}@onaudience.com>"
     msg["X-Entity-Ref-ID"] = str(uuid.uuid4())
 
@@ -246,9 +249,9 @@ def send_email():
 
     with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
         smtp.login(GMAIL_USER, GMAIL_APP_PASS.replace(" ", ""))
-        smtp.sendmail(GMAIL_USER, RECIPIENT, msg.as_string())
+        smtp.sendmail(GMAIL_USER, RECIPIENTS, msg.as_string())
 
-    print(f"      OK: email wyslany do {RECIPIENT}")
+    print(f"      OK: email wyslany do {len(RECIPIENTS)} odbiorcy: {', '.join(RECIPIENTS)}")
 
 # ─── MAIN ────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
