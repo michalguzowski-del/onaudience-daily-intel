@@ -22,6 +22,10 @@ from datetime import datetime
 import requests
 from premailer import transform
 
+# Import generatora treści
+sys.path.insert(0, str(Path(__file__).parent))
+import content_generator
+
 # ─── KONFIGURACJA — wyłącznie zmienne środowiskowe (GitHub Secrets) ──────────
 GMAIL_USER     = os.environ["GMAIL_USER"]
 GMAIL_APP_PASS = os.environ["GMAIL_APP_PASSWORD"]
@@ -252,6 +256,11 @@ if __name__ == "__main__":
     print(f"  OnAudience Daily Intelligence — Pipeline")
     print(f"  {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"{'='*55}\n")
+
+    # KROK 0: Generuj świeżą treść
+    print("[0/4] Generuje swieza tresc...")
+    content_generator.generate()
+    print()
 
     inline_css()
     prepare_nav_links()
