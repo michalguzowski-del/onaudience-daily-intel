@@ -2,13 +2,16 @@ name: OnAudience Daily Intelligence
 
 on:
   schedule:
-    # 9:00 Warsaw CEST (UTC+2) = 07:00 UTC — kwiecień–październik
-    # 9:00 Warsaw CET (UTC+1)  = 08:00 UTC — październik–marzec
-    # GitHub Actions nie obsługuje DST automatycznie — używamy 07:00 UTC
-    # W październiku po zmianie czasu (25.10.2026) zaktualizuj na 08:00 UTC
+    # 9:00 Warsaw CEST (UTC+2) = 07:00 UTC — kwiecien–pazdziernik
+    # 9:00 Warsaw CET  (UTC+1) = 08:00 UTC — pazdziernik–marzec
+    # GitHub Actions nie obsluguje DST automatycznie — uzywamy 07:00 UTC
+    # W pazdzierniku po zmianie czasu (25.10.2026) zaktualizuj na 08:00 UTC
     - cron: '0 7 * * *'
   workflow_dispatch:
-    # Umożliwia ręczne uruchomienie z panelu GitHub Actions
+    # Umozliwia reczne uruchomienie z panelu GitHub Actions
+
+permissions:
+  contents: write   # potrzebne do pushowania do gh-pages
 
 jobs:
   send-newsletter:
@@ -30,15 +33,15 @@ jobs:
 
       - name: Run deploy and send pipeline
         env:
-          GMAIL_USER: michal.guzowski@gmail.com
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
-          NETLIFY_TOKEN: ${{ secrets.NETLIFY_TOKEN }}
-          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
-          RECIPIENT_EMAIL: michal.guzowski@gmail.com
+          RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GH_REPO: michalguzowski-del/onaudience-daily-intel
         run: |
-          python3 deploy_and_send.py $RECIPIENT_EMAIL
+          python3 deploy_and_send.py
 
       - name: Notify on failure
         if: failure()
         run: |
-          echo "❌ Pipeline failed — check logs above"
+          echo "Pipeline failed — sprawdz logi powyzej"
