@@ -175,6 +175,60 @@ def get_response_for_thread(title: str, body: str, subreddit: str) -> dict:
     }
 
 
+# ─── DOZWOLONE SUBREDDITY (biała lista) ──────────────────────────────────────
+ALLOWED_SUBREDDITS = {"adops", "programmatic", "adtech", "PPC", "marketing"}
+
+# Słowa kluczowe NSFW / nieodpowiednie — blokada URL i tytułów
+NSFW_KEYWORDS = [
+    "nsfw", "crossdress", "crossdressing", "lingerie", "fetish", "adult",
+    "porn", "sex", "nude", "naked", "erotic", "18+", "onlyfans",
+    "nightgown", "underwear", "bra", "panties",
+]
+
+
+def is_safe_reddit_url(url: str, expected_subreddit: str) -> bool:
+    """Weryfikuje że URL Reddit prowadzi do właściwego subredditu i nie jest NSFW."""
+    if not url or "reddit.com" not in url:
+        return False
+    
+    url_lower = url.lower()
+    
+    # Sprawdź czy URL zawiera słowa NSFW
+    for kw in NSFW_KEYWORDS:
+        if kw in url_lower:
+            print(f"      BLOKADA NSFW w URL: {url[:80]}")
+            return False
+    
+    # Wyciągnij subreddit z URL
+    match = re.search(r'reddit\.com/r/([^/]+)', url_lower)
+    if not match:
+        return False
+    
+    url_subreddit = match.group(1).lower()
+    
+    # Sprawdź czy subreddit jest na białej liście
+    if url_subreddit not in {s.lower() for s in ALLOWED_SUBREDDITS}:
+        print(f"      BLOKADA nieznany subreddit: r/{url_subreddit} (oczekiwano r/{expected_subreddit})")
+        return False
+    
+    # Sprawdź czy subreddit w URL zgadza się z oczekiwanym
+    if url_subreddit != expected_subreddit.lower():
+        print(f"      BLOKADA niezgodny subreddit: r/{url_subreddit} != r/{expected_subreddit}")
+        return False
+    
+    return True
+
+
+def is_safe_title(title: str) -> bool:
+    """Sprawdza czy tytuł wątku nie zawiera NSFW."""
+    title_lower = title.lower()
+    for kw in NSFW_KEYWORDS:
+        if kw in title_lower:
+            print(f"      BLOKADA NSFW w tytule: {title[:60]}")
+            return False
+    return True
+
+
 # ─── REDDIT SCRAPER ───────────────────────────────────────────────────────────
 
 def fetch_reddit_threads(subreddit: str, limit: int = 8) -> list:
@@ -229,6 +283,12 @@ def fetch_reddit_threads(subreddit: str, limit: int = 8) -> list:
                         time_el = post.select_one("time, .created, [class*='time']")
                         time_str = time_el.get("datetime", time_el.get_text(strip=True) if time_el else "")[:10]
                         
+                        # Weryfikacja bezpieczeństwa URL i tytułu
+                        if not is_safe_reddit_url(reddit_url, subreddit):
+                            continue
+                        if not is_safe_title(title):
+                            continue
+                        
                         threads.append({
                             "title": title,
                             "url": reddit_url,
@@ -264,10 +324,15 @@ def fetch_reddit_via_search(subreddit: str, limit: int = 5) -> list:
         if r.status_code == 200:
             soup = BeautifulSoup(r.text, "html.parser")
             results = soup.select(".result__title a")
-            for result in results[:limit]:
+            for result in results[:limit * 2]:  # pobierz więcej, bo część odfiltrujemy
                 title = result.get_text(strip=True)
                 href = result.get("href", "")
+                # Weryfikacja: musi prowadzić do właściwego subredditu
                 if "reddit.com" in href and f"/r/{subreddit}/" in href:
+                    if not is_safe_reddit_url(href, subreddit):
+                        continue
+                    if not is_safe_title(title):
+                        continue
                     threads.append({
                         "title": title,
                         "url": href,
@@ -688,15 +753,10 @@ def generate():
         time.sleep(1)
     
     # Jeśli brak wątków — użyj fallback z zebranych danych
+    # WAŻNE: Wszystkie URL muszą być zweryfikowane i prowadzić do właściwych subredditów
     if not threads:
         print("  Fallback: uzywam predefiniowanych watkow z biezacego tygodnia...")
         threads = [
-            {
-                "title": "Are users able to tell the difference between personalized and non-personalized display creatives in practice?",
-                "url": "https://www.reddit.com/r/adops/comments/1sc6xxx/are_users_able_to_tell_the_difference/",
-                "body": "Working on a consent UX concept that depends on whether users see a meaningful visual difference between personalised and non-personalised ads. For publishers with strong EU traffic running GAM + Prebid with a TCF CMP — is there typically enough NP demand available?",
-                "score": "4", "comments": "4", "time": TODAY_ISO, "subreddit": "adops",
-            },
             {
                 "title": "TTD: Performance + Control modes + Data partners — is the black box eroding TTD's transparency promise?",
                 "url": "https://www.reddit.com/r/programmatic/comments/1seddr2/ttd_performance_control_modes_data_partners/",
@@ -715,7 +775,15 @@ def generate():
                 "body": "I manage campaigns across both platforms and every morning it's: open Meta, note numbers, open Google, note numbers, build spreadsheet. Do you use a tool for this? Supermetrics? Custom dashboard? What's the biggest thing you wish was easier?",
                 "score": "1", "comments": "8", "time": TODAY_ISO, "subreddit": "adops",
             },
+            {
+                "title": "Curation platforms — CTV & in-app recommendations?",
+                "url": "https://www.reddit.com/r/adops/comments/1s9v0hy/curation_platforms_ctv_inapp_recommendations/",
+                "body": "Looking for recommendations on curation platforms that work well for CTV and in-app environments. We're evaluating options for a cookieless-first approach with Deal ID activation. What's your experience with audience data quality in these channels?",
+                "score": "12", "comments": "23", "time": TODAY_ISO, "subreddit": "adops",
+            },
         ]
+        # Weryfikacja fallback wątków — usuń te z nieprawidłowymi URL
+        threads = [t for t in threads if is_safe_reddit_url(t["url"], t["subreddit"])]
     
     # 2. Pobierz newsy z RSS
     print("  Pobieranie newsow RSS...")
