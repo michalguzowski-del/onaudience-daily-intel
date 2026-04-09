@@ -19,8 +19,10 @@ from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 from datetime import datetime
 
-import requests
-from premailer import transform
+from bootstrap_deps import ensure_module
+
+requests = ensure_module("requests")
+transform = ensure_module("premailer", "premailer").transform
 
 # Import generatora treści
 sys.path.insert(0, str(Path(__file__).parent))

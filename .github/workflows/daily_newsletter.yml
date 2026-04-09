@@ -29,7 +29,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install premailer requests beautifulsoup4 PyNaCl lxml
+          pip install -r requirements.txt
 
       - name: Run deploy and send pipeline
         env:

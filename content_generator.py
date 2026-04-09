@@ -15,8 +15,10 @@ import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from pathlib import Path
 
-import requests
-from bs4 import BeautifulSoup
+from bootstrap_deps import ensure_module
+
+requests = ensure_module("requests")
+BeautifulSoup = ensure_module("bs4", "beautifulsoup4").BeautifulSoup
 
 BASE_DIR = Path(__file__).parent
 TODAY = datetime.now()

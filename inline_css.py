@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Inlinuje CSS do HTML i zapisuje finalny plik email-ready."""
-from premailer import transform
 from pathlib import Path
+
+from bootstrap_deps import ensure_module
+
+transform = ensure_module("premailer", "premailer").transform
 
 src = Path("/home/ubuntu/onaudience_daily_intel_src.html").read_text(encoding="utf-8")
 result = transform(src, remove_classes=False, strip_important=False)
