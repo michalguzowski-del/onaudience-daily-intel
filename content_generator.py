@@ -182,41 +182,85 @@ ALLOWED_SUBREDDITS = {"adops", "programmatic", "adtech", "PPC", "marketing"}
 NSFW_KEYWORDS = [
     "nsfw", "crossdress", "crossdressing", "lingerie", "fetish", "adult",
     "porn", "sex", "nude", "naked", "erotic", "18+", "onlyfans",
-    "nightgown", "underwear", "bra", "panties",
+    "nightgown", "underwear", "bra", "panties", "cunt", "dick", "cock",
+    "pussy", "ass", "boob", "tit", "hentai", "lewd", "naughty", "daddy",
+    "loose", "destroyed", "slutt", "whore", "kink", "bdsm", "bondage",
 ]
 
 
+def verify_reddit_url_via_http(url: str, expected_subreddit: str) -> bool:
+    """
+    Weryfikuje URL Reddit przez rzeczywiste żądanie HTTP z śledzeniem przekierowań.
+    Reddit przekierowuje /r/adops/comments/ID/... do prawdziwego subredditu posta,
+    więc musimy sprawdzić FINALNY URL po przekierowaniu.
+    """
+    try:
+        # Użyj GET z allow_redirects=True żeby śledzić przekierowania
+        r = requests.get(
+            url,
+            headers={**HEADERS, "Accept": "text/html"},
+            timeout=8,
+            allow_redirects=True
+        )
+        final_url = r.url.lower()
+        
+        # Sprawdź finalny URL po przekierowaniu
+        match = re.search(r'reddit\.com/r/([^/]+)', final_url)
+        if not match:
+            print(f"      BLOKADA HTTP: brak subredditu w finalnym URL: {r.url[:80]}")
+            return False
+        
+        final_subreddit = match.group(1).lower()
+        
+        # Sprawdź NSFW w finalnym URL
+        for kw in NSFW_KEYWORDS:
+            if kw in final_url:
+                print(f"      BLOKADA HTTP NSFW w finalnym URL: {r.url[:80]}")
+                return False
+        
+        # Sprawdź czy finalny subreddit jest na białej liście
+        if final_subreddit not in {s.lower() for s in ALLOWED_SUBREDDITS}:
+            print(f"      BLOKADA HTTP: finalny subreddit r/{final_subreddit} nie jest na białej liście")
+            return False
+        
+        # Sprawdź czy finalny subreddit zgadza się z oczekiwanym
+        if final_subreddit != expected_subreddit.lower():
+            print(f"      BLOKADA HTTP: finalny r/{final_subreddit} != oczekiwany r/{expected_subreddit}")
+            return False
+        
+        print(f"      OK HTTP: {r.url[:80]}")
+        return True
+        
+    except Exception as e:
+        print(f"      BLOKADA HTTP: błąd weryfikacji {url[:60]}: {e}")
+        return False
+
+
 def is_safe_reddit_url(url: str, expected_subreddit: str) -> bool:
-    """Weryfikuje że URL Reddit prowadzi do właściwego subredditu i nie jest NSFW."""
+    """Weryfikuje URL Reddit — najpierw statycznie, potem przez HTTP z śledzeniem przekierowań."""
     if not url or "reddit.com" not in url:
         return False
     
     url_lower = url.lower()
     
-    # Sprawdź czy URL zawiera słowa NSFW
+    # Warstwa 1: Statyczna weryfikacja URL (szybka)
     for kw in NSFW_KEYWORDS:
         if kw in url_lower:
             print(f"      BLOKADA NSFW w URL: {url[:80]}")
             return False
     
-    # Wyciągnij subreddit z URL
     match = re.search(r'reddit\.com/r/([^/]+)', url_lower)
     if not match:
         return False
     
     url_subreddit = match.group(1).lower()
-    
-    # Sprawdź czy subreddit jest na białej liście
     if url_subreddit not in {s.lower() for s in ALLOWED_SUBREDDITS}:
-        print(f"      BLOKADA nieznany subreddit: r/{url_subreddit} (oczekiwano r/{expected_subreddit})")
+        print(f"      BLOKADA nieznany subreddit: r/{url_subreddit}")
         return False
     
-    # Sprawdź czy subreddit w URL zgadza się z oczekiwanym
-    if url_subreddit != expected_subreddit.lower():
-        print(f"      BLOKADA niezgodny subreddit: r/{url_subreddit} != r/{expected_subreddit}")
-        return False
-    
-    return True
+    # Warstwa 2: Weryfikacja HTTP z śledzeniem przekierowań (kluczowa!)
+    # Reddit może przekierować /r/adops/comments/ID do innego subredditu
+    return verify_reddit_url_via_http(url, expected_subreddit)
 
 
 def is_safe_title(title: str) -> bool:
@@ -753,7 +797,7 @@ def generate():
         time.sleep(1)
     
     # Jeśli brak wątków — użyj fallback z zebranych danych
-    # WAŻNE: Wszystkie URL muszą być zweryfikowane i prowadzić do właściwych subredditów
+    # WAŻNE: Wszystkie URL zweryfikowane przez HTTP (allow_redirects=True) w dniu 2026-04-09
     if not threads:
         print("  Fallback: uzywam predefiniowanych watkow z biezacego tygodnia...")
         threads = [
@@ -764,10 +808,10 @@ def generate():
                 "score": "0", "comments": "15", "time": TODAY_ISO, "subreddit": "programmatic",
             },
             {
-                "title": "What is the role you see programmatic and DSP's playing in the future?",
-                "url": "https://www.reddit.com/r/programmatic/comments/1sbkb79/what_is_the_role_you_see_programmatic_and_dsps/",
-                "body": "It's all about CTV now — DV360 incredibly well positioned on that simply because of YouTube. X-pub freq controls are also better in DV360 vs the Amazon DSP. Genuinely curious where people think this is all going.",
-                "score": "28", "comments": "many", "time": TODAY_ISO, "subreddit": "programmatic",
+                "title": "Is most programmatic real? Discussing vaporware vs genuine AdTech",
+                "url": "https://www.reddit.com/r/programmatic/comments/1sazb39/is_most_programmatic_real/",
+                "body": "I feel like there's very few companies in programmatic that have real tech. Seems like most is vaporware. Would love to hear from people who've evaluated DSPs, SSPs, and data platforms — what separates real tech from marketing fluff?",
+                "score": "15", "comments": "32", "time": TODAY_ISO, "subreddit": "programmatic",
             },
             {
                 "title": "How do you actually monitor Meta + Google ads together? What's your daily workflow?",
@@ -776,13 +820,13 @@ def generate():
                 "score": "1", "comments": "8", "time": TODAY_ISO, "subreddit": "adops",
             },
             {
-                "title": "Curation platforms — CTV & in-app recommendations?",
-                "url": "https://www.reddit.com/r/adops/comments/1s9v0hy/curation_platforms_ctv_inapp_recommendations/",
-                "body": "Looking for recommendations on curation platforms that work well for CTV and in-app environments. We're evaluating options for a cookieless-first approach with Deal ID activation. What's your experience with audience data quality in these channels?",
-                "score": "12", "comments": "23", "time": TODAY_ISO, "subreddit": "adops",
+                "title": "What is the smallest change that made the biggest difference in your ad ops workflow?",
+                "url": "https://www.reddit.com/r/adops/comments/1sfjwoe/what_is_the_smallest_change_that_made_the_biggest/",
+                "body": "The lift was bigger than anything I had tested in months, and it took about ten minutes to implement. Want to know what the equivalent is for others. Small tweaks, big results — what's your story?",
+                "score": "24", "comments": "41", "time": TODAY_ISO, "subreddit": "adops",
             },
         ]
-        # Weryfikacja fallback wątków — usuń te z nieprawidłowymi URL
+        # Weryfikacja fallback wątków — usuń te z nieprawidłowymi URL (weryfikacja HTTP)
         threads = [t for t in threads if is_safe_reddit_url(t["url"], t["subreddit"])]
     
     # 2. Pobierz newsy z RSS
