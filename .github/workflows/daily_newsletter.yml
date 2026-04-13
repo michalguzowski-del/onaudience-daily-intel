@@ -1,7 +1,8 @@
 name: OnAudience Daily Intelligence
 
 on:
-  
+  schedule:
+    - cron: '0 7 * * 1-5'
   workflow_dispatch:
     # Umozliwia reczne uruchomienie z panelu GitHub Actions
 
